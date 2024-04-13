@@ -50,6 +50,13 @@ module Network.Pcap
     , PktHdr(..)
     , Statistics(..)
 
+    -- new methods
+    , create
+    , activate
+    , setSnapLen
+    , setPromisc
+    , setImmediateMode
+
     -- * Device opening
     , openOffline               -- :: FilePath -> IO Pcap
     , openLive                  -- :: String -> Int -> Bool -> Int -> IO Pcap
@@ -130,6 +137,22 @@ newtype DumpHandle = DumpHandle (ForeignPtr P.PcapDumpTag)
 
 -- | Callback using 'B.ByteString' for packet body.
 type CallbackBS = PktHdr -> B.ByteString -> IO ()
+
+-- New methods
+create :: String -> IO PcapHandle
+create name = PcapHandle `fmap` P.create name
+
+activate :: PcapHandle -> IO ()
+activate pch = withPcap pch $ \hdl -> P.activate hdl
+
+setSnapLen :: PcapHandle -> Int -> IO ()
+setSnapLen pch snapSize = withPcap pch $ \hdl -> P.setSnapLen hdl snapSize
+
+setPromisc :: PcapHandle -> Bool -> IO ()
+setPromisc pch mode = withPcap pch $ \hdl -> P.setPromisc hdl mode
+
+setImmediateMode :: PcapHandle -> Bool -> IO ()
+setImmediateMode pch mode = withPcap pch $ \hdl -> P.setImmediateMode hdl mode
 
 --
 -- Open a device

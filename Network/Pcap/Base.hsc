@@ -65,6 +65,13 @@ module Network.Pcap.Base
     , PktHdr(..)
     , Statistics(..)
 
+    -- new methods
+    , create
+    , activate
+    , setSnapLen
+    , setPromisc
+    , setImmediateMode
+
     -- * Device opening
     , openOffline               -- :: FilePath -> IO Pcap
     , openLive                  -- :: String -> Int -> Bool -> Int -> IO Pcap
@@ -133,6 +140,9 @@ import Network.Socket (Family(..), unpackFamily)
 #include <pcap.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+
+pcap_Error_Activated :: CInt
+pcap_Error_Activated = -4
 
 newtype BpfProgramTag = BpfProgramTag ()
 
@@ -207,6 +217,39 @@ withErrBuf isError f = allocaArray (#const PCAP_ERRBUF_SIZE) $ \errPtr -> do
 
 withErrBuf_ :: (a -> Bool) -> (ErrBuf -> IO a) -> IO ()
 withErrBuf_ isError f = withErrBuf isError f >> return ()
+
+create :: String -- ^ device name
+       -> IO (ForeignPtr PcapTag)
+create name = 
+    withCString name $ \namePtr -> do
+      ptr <- withErrBuf (== nullPtr) $ pcap_create namePtr
+      newForeignPtr ptr (pcap_close ptr)
+
+activate :: Ptr PcapTag -> IO ()
+activate hdl = pcap_activate hdl >>= throwPcapIf_ hdl (/= 0)
+
+setSnapLen :: Ptr PcapTag -> Int -> IO ()
+setSnapLen hdl snapSize = 
+    pcap_set_snaplen hdl (fromIntegral snapSize) >>= throwPcapIf_ hdl (== pcap_Error_Activated)
+
+setPromisc :: Ptr PcapTag -> Bool -> IO ()
+setPromisc hdl mode =
+    pcap_set_promisc hdl (fromBool mode) >>= throwPcapIf_ hdl (== pcap_Error_Activated)
+
+setImmediateMode :: Ptr PcapTag -> Bool -> IO ()
+setImmediateMode hdl mode =
+    pcap_set_immediate_mode hdl (fromBool mode) >>= throwPcapIf_ hdl (== pcap_Error_Activated)
+
+foreign import ccall unsafe pcap_create
+    :: CString   -> ErrBuf -> IO (Ptr PcapTag)
+foreign import ccall unsafe pcap_activate
+    :: Ptr PcapTag -> IO CInt
+foreign import ccall unsafe pcap_set_snaplen
+    :: Ptr PcapTag -> CInt -> IO CInt
+foreign import ccall unsafe pcap_set_promisc
+    :: Ptr PcapTag -> CInt -> IO CInt
+foreign import ccall unsafe pcap_set_immediate_mode
+    :: Ptr PcapTag -> CInt -> IO CInt
 
 -- | 'openOffline' opens a dump file for reading. The file format is
 -- the same as used by @tcpdump@ and Wireshark. The string @\"-\"@ is
